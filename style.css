@@ -386,3 +386,11 @@ h1, h2, h3, h4, .brand {
   .metric { display: flex; align-items: center; justify-content: space-between; }
   .metric small { margin: 0; }
 }
+.mode-bar {
+  border-bottom: 1px solid var(--line);
+}
+.btn-check:checked + .btn-outline-success {
+  background-color: var(--green);
+  border-color: var(--green);
+  color: white;
+}

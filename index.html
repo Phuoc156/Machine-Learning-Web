@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>FaceLens — Browser-based Machine Learning (Topic 4)</title>
+  <title>FaceLens & ObjectLens — Browser-based ML (Topic 4)</title>
   
   <!-- CSS Stylesheets -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -12,15 +12,18 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 
-  <!-- TensorFlow.js Core & MediaPipe Face Detection Packages -->
+  <!-- TensorFlow.js Core Bundle -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+  <!-- Model 1: Face Detection -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-detection@1.0.2/dist/face-detection.min.js"></script>
+  <!-- Model 2: Object Recognition (COCO-SSD 80 classes) -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
 </head>
 <body>
 <nav class="navbar navbar-expand-lg sticky-top">
   <div class="container py-2">
     <a class="navbar-brand d-flex align-items-center gap-2 m-0" href="#">
-      <span class="brand-mark">4</span><span class="brand">FaceLens AI<span style="color:var(--green)">.</span></span>
+      <span class="brand-mark">4</span><span class="brand">WebML Studio<span style="color:var(--green)">.</span></span>
     </a>
     <div class="ms-auto d-flex align-items-center gap-2">
       <span class="badge rounded-pill text-bg-light border text-muted px-3 py-2">Midterm Assignment · Topic 4</span>
@@ -33,12 +36,12 @@
     <div class="row align-items-center g-4">
       <div class="col-lg-8">
         <div class="eyebrow"><span class="pulse-dot"></span> TOPIC 4: MACHINE LEARNING ON THE WEB</div>
-        <h1>Real-time Face Detection.<br><span>Client-Side TensorFlow.js.</span></h1>
-        <p>Hệ thống xử lý trực tiếp trên trình duyệt sử dụng mô hình học sâu MediaPipe FaceDetector với backend tăng tốc WebGL. Khung hình webcam được tính toán tại chỗ mà không cần gửi về server.</p>
+        <h1>Face Detection &<br><span>Object Recognition.</span></h1>
+        <p>Hệ thống thị giác máy tính chạy hoàn toàn trên trình duyệt với TensorFlow.js và WebGL. Hỗ trợ song song cả phát hiện khuôn mặt và nhận diện 80 lớp vật thể thời gian thực qua webcam.</p>
         <div class="d-flex flex-wrap gap-4 mt-3">
-          <span class="stat-chip"><span class="pulse-dot"></span><strong>Client Inference (Zero Server Overhead)</strong></span>
-          <span class="stat-chip"><strong>MediaPipe Short-range</strong></span>
-          <span class="stat-chip"><strong>Tăng tốc GPU WebGL</strong></span>
+          <span class="stat-chip"><span class="pulse-dot"></span><strong>Client Inference (WebGL GPU)</strong></span>
+          <span class="stat-chip"><strong>MediaPipe Face</strong></span>
+          <span class="stat-chip"><strong>COCO-SSD Objects</strong></span>
         </div>
       </div>
     </div>
@@ -53,22 +56,34 @@
         <div class="demo-card h-100">
           <div class="demo-head">
             <div>
-              <div class="fw-bold fs-5">Studio Phát Hiện Khuôn Mặt</div>
-              <div class="text-secondary small mt-1">Sử dụng luồng getUserMedia() và pipeline dự đoán liên tục</div>
+              <div class="fw-bold fs-5">Studio Thị Giác Máy Tính Trình Duyệt</div>
+              <div class="text-secondary small mt-1">Chuyển đổi linh hoạt giữa Face Detection và Object Recognition</div>
             </div>
             <span id="liveBadge" class="live-label"><span class="pulse-dot" id="badgeDot" style="background:#aab5ad;box-shadow:none"></span><span id="liveText">CHƯA KHỞI CHẠY</span></span>
           </div>
 
+          <!-- Bộ chọn chế độ AI Model -->
+          <div class="mode-bar px-4 py-3 bg-light border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <span class="fw-bold text-secondary small">CHỌN TÁC VỤ AI:</span>
+            <div class="btn-group" role="group" aria-label="AI Mode Switch">
+              <input type="radio" class="btn-check" name="aiMode" id="modeFace" value="face" checked autocomplete="off">
+              <label class="btn btn-outline-success btn-sm px-3 fw-bold" for="modeFace">Face Detection</label>
+
+              <input type="radio" class="btn-check" name="aiMode" id="modeObject" value="object" autocomplete="off">
+              <label class="btn btn-outline-success btn-sm px-3 fw-bold" for="modeObject">Object Recognition (COCO-SSD)</label>
+            </div>
+          </div>
+
           <div class="camera-stage" id="cameraStage">
-            <div class="stage-corner">TFJS DETECTOR <span class="opacity-75">/ WEBGL</span></div>
+            <div class="stage-corner" id="stageTech">TFJS / WEBGL</div>
             <div class="stage-corner right" id="stageMode">PREVIEW MODE</div>
             
             <div class="camera-placeholder" id="cameraPlaceholder">
               <div class="camera-icon">
                 <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3z"/><circle cx="9.5" cy="12" r="2.5"/></svg>
               </div>
-              <h3>Sẵn sàng phát hiện AI</h3>
-              <p>Nhấn "Bật Camera & Chạy AI" để tải mô hình học máy vào bộ nhớ WebGL và mở webcam.</p>
+              <h3>Sẵn sàng xử lý AI trên máy khách</h3>
+              <p>Chọn tác vụ bên trên và nhấn "Bật Camera & Chạy AI" để bắt đầu nhận diện.</p>
             </div>
 
             <video id="cameraVideo" autoplay playsinline muted></video>
@@ -90,40 +105,33 @@
       <div class="col-lg-4">
         <div class="d-flex flex-column gap-3 h-100">
           <div class="metrics">
-            <div class="metric"><small>Khuôn mặt</small><strong id="faceCount">0</strong></div>
+            <div class="metric"><small id="countLabel">Mục phát hiện</small><strong id="detectedCount">0</strong></div>
             <div class="metric"><small>FPS thực</small><strong id="fpsValue">—</strong></div>
-            <div class="metric"><small>Trạng thái</small><strong id="modelStatus" style="font-size:1.05rem">Chưa tải</strong></div>
+            <div class="metric"><small>Mô hình nạp</small><strong id="modelStatus" style="font-size:0.95rem">Chưa tải</strong></div>
           </div>
 
           <div class="info-card flex-grow-1">
             <div class="section-kicker mb-2">Thông số Kỹ Thuật</div>
-            <h3 class="mb-3">Quy trình xử lý AI</h3>
+            <h3 class="mb-3">Kiến Trúc Đề Tài Số 4</h3>
             <div class="architecture-step">
               <div class="step-number">1</div>
               <div>
-                <h6 class="fw-bold mb-1">WebGL Backend Init</h6>
-                <p class="text-muted small mb-0">Khởi tạo tf.setBackend('webgl') để khai thác Shader GPU trên máy client.</p>
+                <h6 class="fw-bold mb-1">Dual-Model Pipeline</h6>
+                <p class="text-muted small mb-0">Hỗ trợ cả <strong>MediaPipe Face</strong> và <strong>COCO-SSD</strong> phân loại 80 lớp vật thể (người, laptop, điện thoại, sách, cốc, xe cộ,...).</p>
               </div>
             </div>
             <div class="architecture-step">
               <div class="step-number">2</div>
               <div>
-                <h6 class="fw-bold mb-1">Model Loading</h6>
-                <p class="text-muted small mb-0">Nạp trọng số pre-trained MediaPipe FaceDetector (Short-range model).</p>
+                <h6 class="fw-bold mb-1">In-browser Inference</h6>
+                <p class="text-muted small mb-0">Tính toán hoàn toàn bằng nhân WebGL GPU cục bộ, đảm bảo tính riêng tư tuyệt đối (Privacy by Design).</p>
               </div>
             </div>
             <div class="architecture-step">
               <div class="step-number">3</div>
               <div>
-                <h6 class="fw-bold mb-1">Inference Loop</h6>
-                <p class="text-muted small mb-0">Trích xuất frame từ thẻ video, chạy <code>estimateFaces()</code> bằng requestAnimationFrame.</p>
-              </div>
-            </div>
-            <div class="architecture-step">
-              <div class="step-number">4</div>
-              <div>
-                <h6 class="fw-bold mb-1">Canvas Render</h6>
-                <p class="text-muted small mb-0">Vẽ Bounding Box, hiển thị độ tin cậy (Confidence %) và các điểm mốc Keypoints (mắt, mũi, miệng).</p>
+                <h6 class="fw-bold mb-1">Canvas Bounding Boxes</h6>
+                <p class="text-muted small mb-0">Tự động gắn nhãn (class label) và tỷ lệ độ tin cậy (Confidence Score %) theo thời gian thực.</p>
               </div>
             </div>
           </div>
@@ -138,10 +146,10 @@
   <div class="container d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 text-muted small">
     <div class="d-flex align-items-center gap-2">
       <span class="brand-mark" style="width:26px;height:26px;border-radius:8px;font-size:.75rem">4</span>
-      <span class="fw-bold text-dark">FaceLens — Web Programming Midterm Project</span>
+      <span class="fw-bold text-dark">FaceLens & ObjectLens — Midterm Demo</span>
     </div>
-    <span>Chủ đề: Machine Learning on the Web</span>
-    <span>TensorFlow.js · MediaPipe · Bootstrap 5</span>
+    <span>Topic 4: Machine Learning on the Web</span>
+    <span>TensorFlow.js · MediaPipe · COCO-SSD</span>
   </div>
 </footer>
 
