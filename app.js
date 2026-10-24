@@ -22,6 +22,90 @@
 
   const modeRadios = document.querySelectorAll('input[name="aiMode"]');
 
+  // Change name object to VietNamese
+  const OBJECT_LABELS_VI = {
+    person: "Người",
+    bicycle: "Xe đạp",
+    car: "Ô tô",
+    motorcycle: "Xe máy",
+    airplane: "Máy bay",
+    bus: "Xe buýt",
+    train: "Tàu hỏa",
+    truck: "Xe tải",
+    boat: "Thuyền",
+    "traffic light": "Đèn giao thông",
+    "fire hydrant": "Trụ cứu hỏa",
+    "stop sign": "Biển báo dừng",
+    "parking meter": "Đồng hồ đỗ xe",
+    bench: "Ghế băng",
+    bird: "Chim",
+    cat: "Mèo",
+    dog: "Chó",
+    horse: "Ngựa",
+    sheep: "Cừu",
+    cow: "Bò",
+    elephant: "Voi",
+    bear: "Gấu",
+    zebra: "Ngựa vằn",
+    giraffe: "Hươu cao cổ",
+    backpack: "Ba lô",
+    umbrella: "Ô / dù",
+    handbag: "Túi xách",
+    tie: "Cà vạt",
+    suitcase: "Va li",
+    frisbee: "Đĩa ném",
+    skis: "Ván trượt tuyết",
+    snowboard: "Ván trượt tuyết",
+    "sports ball": "Bóng thể thao",
+    kite: "Diều",
+    "baseball bat": "Gậy bóng chày",
+    "baseball glove": "Găng bóng chày",
+    skateboard: "Ván trượt",
+    surfboard: "Ván lướt sóng",
+    "tennis racket": "Vợt tennis",
+    bottle: "Chai / bình",
+    "wine glass": "Ly rượu",
+    cup: "Cốc",
+    fork: "Nĩa",
+    knife: "Dao",
+    spoon: "Thìa",
+    bowl: "Bát",
+    banana: "Chuối",
+    apple: "Táo",
+    sandwich: "Bánh mì kẹp",
+    orange: "Cam",
+    broccoli: "Bông cải xanh",
+    carrot: "Cà rốt",
+    "hot dog": "Xúc xích kẹp bánh mì",
+    pizza: "Pizza",
+    donut: "Bánh donut",
+    cake: "Bánh ngọt",
+    chair: "Ghế",
+    couch: "Ghế sofa",
+    "potted plant": "Cây trồng trong chậu",
+    bed: "Giường",
+    "dining table": "Bàn ăn",
+    toilet: "Bồn cầu",
+    tv: "Tivi",
+    laptop: "Máy tính xách tay",
+    mouse: "Chuột máy tính",
+    remote: "Điều khiển từ xa",
+    keyboard: "Bàn phím",
+    "cell phone": "Điện thoại",
+    microwave: "Lò vi sóng",
+    oven: "Lò nướng",
+    toaster: "Máy nướng bánh mì",
+    sink: "Bồn rửa",
+    refrigerator: "Tủ lạnh",
+    book: "Sách",
+    clock: "Đồng hồ",
+    vase: "Bình hoa",
+    scissors: "Kéo",
+    "teddy bear": "Gấu bông",
+    "hair drier": "Máy sấy tóc",
+    toothbrush: "Bàn chải đánh răng"
+  };  
+
   // 2. State Variables
   let stream = null;
   let faceDetector = null;
@@ -75,7 +159,7 @@
       if (!objectDetector) {
         setStatus('Đang tải mô hình Object Recognition (COCO-SSD)...', 'loading');
         modelStatus.textContent = 'Đang nạp COCO...';
-        objectDetector = await cocoSsd.load();
+        objectDetector = await cocoSsd.load({base: 'mobilenet_v2'});
       }
       modelStatus.textContent = 'COCO-SSD (80 Objects)';
       stageTech.textContent = 'OBJECT RECOGNITION';
@@ -133,13 +217,22 @@
 
   // 5. Vẽ kết quả Object Recognition (COCO-SSD)
   function drawObjects(predictions) {
+    console.table(predictions.map((p, i) => ({
+      index: i,
+      class: p.class,
+      score: p.score,
+      bbox: p.bbox
+    })))
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     detectedCount.textContent = predictions.length;
 
     predictions.forEach(pred => {
       const [x, y, width, height] = pred.bbox;
       const score = Math.round(pred.score * 100);
-      const label = `${pred.class.toUpperCase()} ${score}%`;
+      const classNameVi =
+        OBJECT_LABELS_VI[pred.class] || pred.class;
+
+      const label = `${classNameVi} ${score}%`;
 
       // Hộp nhận diện màu xanh dương hiện đại
       ctx.strokeStyle = '#38bdf8';
