@@ -215,23 +215,97 @@
     });
   }
 
-  // 5. Vẽ kết quả Object Recognition (COCO-SSD)
-  function drawObjects(predictions) {
-    console.table(predictions.map((p, i) => ({
-      index: i,
-      class: p.class,
-      score: p.score,
-      bbox: p.bbox
-    })))
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    detectedCount.textContent = predictions.length;
+  // ==========================================
+  // BỘ NHỚ ĐỆM LÀM MƯỢT BOUNDING BOX (CHỐNG NHẢY MÚA)
+  // ==========================================
+  let trackedObjectsMap = new Map(); // Lưu trạng thái mượt của các vật thể qua các frame
+
+  function smoothPredictions(predictions) {
+    const alpha = 0.35; // Hệ số làm mượt (0 < alpha <= 1). Càng nhỏ càng mượt, càng lớn càng bám sát thực tế.
+    const currentTracked = new Map();
 
     predictions.forEach(pred => {
       const [x, y, width, height] = pred.bbox;
-      const score = Math.round(pred.score * 100);
-      const classNameVi =
-        OBJECT_LABELS_VI[pred.class] || pred.class;
+      const className = pred.class;
+      
+      // Tìm xem trong các box đang track có box nào cùng class và ở gần vị trí này không
+      let bestMatchKey = null;
+      let minDistance = Infinity;
 
+      trackedObjectsMap.forEach((boxData, key) => {
+        if (key.startsWith(className)) {
+          const prevCx = boxData.x + boxData.width / 2;
+          const prevCy = boxData.y + boxData.height / 2;
+          const curCx = x + width / 2;
+          const curCy = y + height / 2;
+          const dist = Math.hypot(curCx - prevCx, curCy - prevCy);
+
+          // Ngưỡng khoảng cách tối đa (pixel) để coi là cùng một vật thể giữa 2 frame liên tiếp
+          if (dist < 120 && dist < minDistance) {
+            minDistance = dist;
+            bestMatchKey = key;
+          }
+        }
+      });
+
+      let finalBox;
+      const uniqueKey = bestMatchKey || `${className}_${Math.random().toString(36).substring(2, 7)}`;
+
+      if (bestMatchKey && trackedObjectsMap.has(bestMatchKey)) {
+        // Áp dụng EMA (Exponential Moving Average) để nội suy tọa độ mượt mà
+        const prev = trackedObjectsMap.get(bestMatchKey);
+        finalBox = {
+          x: prev.x * (1 - alpha) + x * alpha,
+          y: prev.y * (1 - alpha) + y * alpha,
+          width: prev.width * (1 - alpha) + width * alpha,
+          height: prev.height * (1 - alpha) + height * alpha,
+          score: pred.score,
+          class: className,
+          missingCount: 0
+        };
+      } else {
+        // Vật thể mới xuất hiện
+        finalBox = {
+          x, y, width, height,
+          score: pred.score,
+          class: className,
+          missingCount: 0
+        };
+      }
+
+      currentTracked.set(uniqueKey, finalBox);
+    });
+
+    // Giữ lại các box cũ tối đa 2 frame nếu bị mất dấu tạm thời (chống hiện tượng chớp nháy liên tục)
+    trackedObjectsMap.forEach((boxData, key) => {
+      if (!currentTracked.has(key)) {
+        boxData.missingCount = (boxData.missingCount || 0) + 1;
+        if (boxData.missingCount < 3) { 
+          currentTracked.set(key, boxData);
+        }
+      }
+    });
+
+    trackedObjectsMap = currentTracked;
+    return Array.from(trackedObjectsMap.values());
+  }
+
+  // 5. Vẽ kết quả Object Recognition (COCO-SSD) đã được làm mượt
+  function drawObjects(predictions) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Bước 1: Lọc bỏ các dự đoán có độ tin cậy thấp (< 65%) để tránh nhận diện nhầm nền
+    const validPredictions = predictions.filter(pred => pred.score >= 0.65);
+
+    // Bước 2: Đưa qua bộ lọc làm mượt qua các frame
+    const smoothedPredictions = smoothPredictions(validPredictions);
+
+    detectedCount.textContent = smoothedPredictions.length;
+
+    smoothedPredictions.forEach(pred => {
+      const { x, y, width, height, score: rawScore, class: className } = pred;
+      const score = Math.round(rawScore * 100);
+      const classNameVi = OBJECT_LABELS_VI[className] || className;
       const label = `${classNameVi} ${score}%`;
 
       // Hộp nhận diện màu xanh dương hiện đại
@@ -239,7 +313,7 @@
       ctx.lineWidth = 3;
       ctx.strokeRect(x, y, width, height);
 
-      // Viền góc
+      // Viền góc trang trí
       const cornerLen = 14;
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 4;
