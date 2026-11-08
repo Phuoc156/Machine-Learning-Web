@@ -180,7 +180,7 @@
     });
   });
 
-  // 4. Vẽ kết quả Face Detection
+  // 4. Vẽ kết quả Face Detection (Đã lật tọa độ X để khớp video mà chữ không bị ngược)
   function drawFaces(faces) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     detectedCount.textContent = faces.length;
@@ -188,26 +188,25 @@
     faces.forEach(face => {
       const box = face.box;
       const score = Math.round((face.score || 0) * 100);
+      const flippedX = canvas.width - box.xMin - box.width;
 
-      // Bounding box
       ctx.strokeStyle = '#38d976';
       ctx.lineWidth = 3;
-      ctx.strokeRect(box.xMin, box.yMin, box.width, box.height);
+      ctx.strokeRect(flippedX, box.yMin, box.width, box.height);
 
-      // Nhãn
       const labelText = `Face: ${score}%`;
       ctx.font = '600 13px Manrope, sans-serif';
       const textWidth = ctx.measureText(labelText).width;
       ctx.fillStyle = 'rgba(23, 34, 29, 0.85)';
-      ctx.fillRect(box.xMin, Math.max(0, box.yMin - 24), textWidth + 14, 22);
+      ctx.fillRect(flippedX, Math.max(0, box.yMin - 24), textWidth + 14, 22);
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(labelText, box.xMin + 7, Math.max(16, box.yMin - 8));
+      ctx.fillText(labelText, flippedX + 7, Math.max(16, box.yMin - 8));
 
-      // Keypoints
       if (face.keypoints) {
         face.keypoints.forEach(pt => {
+          const flippedPtX = canvas.width - pt.x;
           ctx.beginPath();
-          ctx.arc(pt.x, pt.y, 3.5, 0, 2 * Math.PI);
+          ctx.arc(flippedPtX, pt.y, 3.5, 0, 2 * Math.PI);
           ctx.fillStyle = '#ffdf5d';
           ctx.fill();
         });
@@ -218,17 +217,16 @@
   // ==========================================
   // BỘ NHỚ ĐỆM LÀM MƯỢT BOUNDING BOX (CHỐNG NHẢY MÚA)
   // ==========================================
-  let trackedObjectsMap = new Map(); // Lưu trạng thái mượt của các vật thể qua các frame
+  let trackedObjectsMap = new Map();
 
   function smoothPredictions(predictions) {
-    const alpha = 0.35; // Hệ số làm mượt (0 < alpha <= 1). Càng nhỏ càng mượt, càng lớn càng bám sát thực tế.
+    const alpha = 0.35;
     const currentTracked = new Map();
 
     predictions.forEach(pred => {
       const [x, y, width, height] = pred.bbox;
       const className = pred.class;
       
-      // Tìm xem trong các box đang track có box nào cùng class và ở gần vị trí này không
       let bestMatchKey = null;
       let minDistance = Infinity;
 
@@ -240,7 +238,6 @@
           const curCy = y + height / 2;
           const dist = Math.hypot(curCx - prevCx, curCy - prevCy);
 
-          // Ngưỡng khoảng cách tối đa (pixel) để coi là cùng một vật thể giữa 2 frame liên tiếp
           if (dist < 120 && dist < minDistance) {
             minDistance = dist;
             bestMatchKey = key;
@@ -252,7 +249,6 @@
       const uniqueKey = bestMatchKey || `${className}_${Math.random().toString(36).substring(2, 7)}`;
 
       if (bestMatchKey && trackedObjectsMap.has(bestMatchKey)) {
-        // Áp dụng EMA (Exponential Moving Average) để nội suy tọa độ mượt mà
         const prev = trackedObjectsMap.get(bestMatchKey);
         finalBox = {
           x: prev.x * (1 - alpha) + x * alpha,
@@ -264,7 +260,6 @@
           missingCount: 0
         };
       } else {
-        // Vật thể mới xuất hiện
         finalBox = {
           x, y, width, height,
           score: pred.score,
@@ -276,7 +271,6 @@
       currentTracked.set(uniqueKey, finalBox);
     });
 
-    // Giữ lại các box cũ tối đa 2 frame nếu bị mất dấu tạm thời (chống hiện tượng chớp nháy liên tục)
     trackedObjectsMap.forEach((boxData, key) => {
       if (!currentTracked.has(key)) {
         boxData.missingCount = (boxData.missingCount || 0) + 1;
@@ -290,14 +284,11 @@
     return Array.from(trackedObjectsMap.values());
   }
 
-  // 5. Vẽ kết quả Object Recognition (COCO-SSD) đã được làm mượt
+  // 5. Vẽ kết quả Object Recognition (COCO-SSD) đã được lật tọa độ chữ xuôi
   function drawObjects(predictions) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Bước 1: Lọc bỏ các dự đoán có độ tin cậy thấp (< 65%) để tránh nhận diện nhầm nền
     const validPredictions = predictions.filter(pred => pred.score >= 0.65);
-
-    // Bước 2: Đưa qua bộ lọc làm mượt qua các frame
     const smoothedPredictions = smoothPredictions(validPredictions);
 
     detectedCount.textContent = smoothedPredictions.length;
@@ -308,27 +299,28 @@
       const classNameVi = OBJECT_LABELS_VI[className] || className;
       const label = `${classNameVi} ${score}%`;
 
-      // Hộp nhận diện màu xanh dương hiện đại
+      const flippedX = canvas.width - x - width;
+
       ctx.strokeStyle = '#38bdf8';
       ctx.lineWidth = 3;
-      ctx.strokeRect(x, y, width, height);
+      ctx.strokeRect(flippedX, y, width, height);
 
-      // Viền góc trang trí
       const cornerLen = 14;
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 4;
       ctx.beginPath();
-      ctx.moveTo(x, y + cornerLen); ctx.lineTo(x, y); ctx.lineTo(x + cornerLen, y);
+      ctx.moveTo(flippedX, y + cornerLen); 
+      ctx.lineTo(flippedX, y); 
+      ctx.lineTo(flippedX + cornerLen, y);
       ctx.stroke();
 
-      // Nhãn tên lớp vật thể
       ctx.font = '700 13px Manrope, sans-serif';
       const textWidth = ctx.measureText(label).width;
       ctx.fillStyle = 'rgba(14, 116, 144, 0.9)';
-      ctx.fillRect(x, Math.max(0, y - 24), textWidth + 14, 22);
+      ctx.fillRect(flippedX, Math.max(0, y - 24), textWidth + 14, 22);
 
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(label, x + 7, Math.max(16, y - 8));
+      ctx.fillText(label, flippedX + 7, Math.max(16, y - 8));
     });
   }
 
@@ -346,7 +338,6 @@
           drawObjects(predictions);
         }
 
-        // Đo FPS
         frameCount++;
         const now = performance.now();
         if (now - lastFrameTime >= 1000) {
@@ -456,7 +447,7 @@
     setStatus('Sẵn sàng tải mô hình và kết nối webcam.');
   });
 
-  window.addEventListener('pagehide', () => {
+    window.addEventListener('pagehide', () => {
     if (stream) stream.getTracks().forEach(t => t.stop());
   });
 })();

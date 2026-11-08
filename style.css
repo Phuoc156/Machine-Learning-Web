@@ -198,7 +198,7 @@ h1, h2, h3, h4, .brand {
   position: absolute; 
   top: 0; 
   left: 0; 
-  pointer-events: none; 
+  pointer-events: none;
 }
 
 .camera-placeholder { 
